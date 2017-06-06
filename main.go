@@ -24,11 +24,12 @@ func main() {
 	base := "http://news.ycombinator.com/news?p="
 	page := 1
 
+Loop:
 	for {
 		select {
 		case endScraper := <-done:
 			_ = endScraper
-			break
+			break Loop
 		default:
 			// increment page number
 			page++
@@ -47,11 +48,11 @@ func main() {
 	fmt.Println("wg.Wait() done")
 }
 
-func loadContent(page string, done chan<- bool, wg *sync.WaitGroup) {
+func loadContent(url string, done chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// load html
-	doc, err := goquery.NewDocument(page)
+	doc, err := goquery.NewDocument(url)
 	checkErr(err)
 
 	// find relevant bits
