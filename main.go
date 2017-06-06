@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 
 	// import third party libraries
 	"github.com/PuerkitoBio/goquery"
@@ -17,7 +18,38 @@ const (
 	DB_NAME = "testdb"
 )
 
-func loadContent(page string, done chan<- string) {
+func main() {
+	var wg sync.WaitGroup
+	done := make(chan bool)
+	base := "http://news.ycombinator.com/news?p="
+	page := 1
+
+	for {
+		select {
+		case endScraper := <-done:
+			_ = endScraper
+			break
+		default:
+			// increment page number
+			page++
+			// print page number
+			fmt.Println("page-->", page)
+			// construct next page url
+			url := base + strconv.Itoa(page)
+			// add one to sync group
+			wg.Add(1)
+			// spawn go rountine to load, scrape and save data
+			go loadContent(url, done, &wg)
+		}
+	}
+
+	wg.Wait()
+	fmt.Println("wg.Wait() done")
+}
+
+func loadContent(page string, done chan<- bool, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	// load html
 	doc, err := goquery.NewDocument(page)
 	checkErr(err)
@@ -28,7 +60,7 @@ func loadContent(page string, done chan<- string) {
 	if selection.Length() > 0 {
 		selection.Each(scrapeContent)
 	} else {
-		done <- "Nothing more to scrape"
+		done <- true
 	}
 }
 
@@ -66,17 +98,4 @@ func checkErr(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func main() {
-	done := make(chan string)
-	base := "http://news.ycombinator.com/news?p="
-
-	for page := 1; page < 100; page++ {
-		url := base + strconv.Itoa(page)
-		go loadContent(url, done)
-	}
-
-	msg := <-done
-	fmt.Println(msg)
 }
